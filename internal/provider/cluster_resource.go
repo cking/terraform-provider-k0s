@@ -28,30 +28,34 @@ var _ resource.Resource = &ClusterResource{}
 var _ resource.ResourceWithImportState = &ClusterResource{}
 
 type ClusterResourceModel struct {
-	ID            types.String               `tfsdk:"id"`
-	Name          types.String               `tfsdk:"name"`
-	Version       types.String               `tfsdk:"version"`
-	Hosts         []ClusterResourceModelHost `tfsdk:"hosts"`
-	Kubeconfig    types.String               `tfsdk:"kubeconfig"`
-	DynamicConfig types.Bool                 `tfsdk:"dynamic_config"`
-	Config        types.String               `tfsdk:"config"`
-	Concurrency   types.Int64                `tfsdk:"concurrency"`
-	NoWait        types.Bool                 `tfsdk:"no_wait"`
-	NoDrain       types.Bool                 `tfsdk:"no_drain"`
-	Timeouts      timeouts.Value             `tfsdk:"timeouts"`
+	ID   types.String `tfsdk:"id"`
+	Name types.String `tfsdk:"name"`
+
+	Version       types.String   `tfsdk:"version"`
+	Config        types.String   `tfsdk:"config"`
+	DynamicConfig types.Bool     `tfsdk:"dynamic_config"`
+	Concurrency   types.Int64    `tfsdk:"concurrency"`
+	NoWait        types.Bool     `tfsdk:"no_wait"`
+	NoDrain       types.Bool     `tfsdk:"no_drain"`
+	Timeouts      timeouts.Value `tfsdk:"timeouts"`
+
+	Hosts []ClusterResourceModelHost `tfsdk:"hosts"`
+
+	Kubeconfig types.String `tfsdk:"kubeconfig"`
 }
 
 type ClusterResourceModelHost struct {
 	Role             types.String                `tfsdk:"role"`
 	NoTaints         types.Bool                  `tfsdk:"no_taints"`
 	Hostname         types.String                `tfsdk:"hostname"`
-	SSH              ClusterResourceModelHostSSH `tfsdk:"ssh"`
-	PrivateInterface types.String                `tfsdk:"private_interface"`
-	PrivateAddress   types.String                `tfsdk:"private_address"`
-	OS               types.String                `tfsdk:"os"`
 	InstallFlags     types.List                  `tfsdk:"install_flags"`
 	Environment      types.Map                   `tfsdk:"environment"`
 	Files            []ClusterResourceModelFiles `tfsdk:"files"`
+	OS               types.String                `tfsdk:"os"`
+	PrivateInterface types.String                `tfsdk:"private_interface"`
+	PrivateAddress   types.String                `tfsdk:"private_address"`
+
+	SSH ClusterResourceModelHostSSH `tfsdk:"ssh"`
 }
 
 type ClusterResourceModelFiles struct {
@@ -64,6 +68,16 @@ type ClusterResourceModelFiles struct {
 }
 
 type ClusterResourceModelHostSSH struct {
+	Address types.String `tfsdk:"address"`
+	User    types.String `tfsdk:"user"`
+	Port    types.Int64  `tfsdk:"port"`
+	KeyPath types.String `tfsdk:"key_path"`
+	Key     types.String `tfsdk:"key"`
+
+	Bastion ClusterResourceModelHostSSHBastion `tfsdk:"bastion"`
+}
+
+type ClusterResourceModelHostSSHBastion struct {
 	Address types.String `tfsdk:"address"`
 	User    types.String `tfsdk:"user"`
 	Port    types.Int64  `tfsdk:"port"`
@@ -216,6 +230,43 @@ func (r *ClusterResource) Schema(ctx context.Context, req resource.SchemaRequest
 										stringvalidator.ConflictsWith(path.Expressions{
 											path.MatchRelative().AtParent().AtName("key_path"),
 										}...),
+									},
+								},
+								"bastion": schema.SingleNestedAttribute{
+									MarkdownDescription: "SSH bastion connection options.",
+									Optional:            true,
+									Attributes: map[string]schema.Attribute{
+										"address": schema.StringAttribute{
+											MarkdownDescription: "IP address of the host.",
+											Required:            true,
+										},
+										"user": schema.StringAttribute{
+											MarkdownDescription: "Username to log in as.",
+											Optional:            true,
+										},
+										"port": schema.Int64Attribute{
+											MarkdownDescription: "TCP port of the SSH service on the host.",
+											Required:            true,
+										},
+										"key_path": schema.StringAttribute{
+											MarkdownDescription: "Path to an SSH private key file.",
+											Optional:            true,
+											Validators: []validator.String{
+												stringvalidator.ConflictsWith(path.Expressions{
+													path.MatchRelative().AtParent().AtName("key"),
+												}...),
+											},
+										},
+										"key": schema.StringAttribute{
+											MarkdownDescription: "SSH private key in PEM format.",
+											Optional:            true,
+											Sensitive:           true,
+											Validators: []validator.String{
+												stringvalidator.ConflictsWith(path.Expressions{
+													path.MatchRelative().AtParent().AtName("key_path"),
+												}...),
+											},
+										},
 									},
 								},
 							},
@@ -537,6 +588,26 @@ func getK0sctlConfig(ctx context.Context, dia *diag.Diagnostics, data *ClusterRe
 			}
 			ssh.AuthMethods = authMethods
 		}
+
+		if host.SSH.Bastion.Address.IsNull() {
+			ssh.Bastion = nil
+		} else {
+			ssh.Bastion = &k0s_rig.SSH{
+				Address: host.SSH.Bastion.Address.ValueString(),
+				Port:    int(host.SSH.Bastion.Port.ValueInt64()),
+				User:    host.SSH.Bastion.User.ValueString(),
+				KeyPath: host.SSH.Bastion.KeyPath.ValueStringPointer(),
+			}
+			if !host.SSH.Bastion.Key.IsNull() {
+				authMethods, err := k0s_rig.ParseSSHPrivateKey([]byte(host.SSH.Bastion.Key.ValueString()), nil)
+				if err != nil {
+					dia.AddError("unable to parse ssh key", err.Error())
+					return nil
+				}
+				ssh.Bastion.AuthMethods = authMethods
+			}
+		}
+
 		k0sctlHosts = append(k0sctlHosts, &k0sctl_cluster.Host{
 			Connection: k0s_rig.Connection{
 				SSH: &ssh,

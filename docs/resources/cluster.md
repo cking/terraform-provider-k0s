@@ -94,9 +94,25 @@ Required:
 
 Optional:
 
+- `bastion` (Attributes) SSH bastion connection options. (see [below for nested schema](#nestedatt--hosts--ssh--bastion))
 - `key` (String, Sensitive) SSH private key in PEM format.
 - `key_path` (String) Path to an SSH private key file.
 - `user` (String) Username to log in as.
+
+<a id="nestedatt--hosts--ssh--bastion"></a>
+### Nested Schema for `hosts.ssh.bastion`
+
+Required:
+
+- `address` (String) IP address of the host.
+- `port` (Number) TCP port of the SSH service on the host.
+
+Optional:
+
+- `key` (String, Sensitive) SSH private key in PEM format.
+- `key_path` (String) Path to an SSH private key file.
+- `user` (String) Username to log in as.
+
 
 
 <a id="nestedatt--hosts--files"></a>
