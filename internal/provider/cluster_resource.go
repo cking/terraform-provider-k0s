@@ -74,7 +74,7 @@ type ClusterResourceModelHostSSH struct {
 	KeyPath types.String `tfsdk:"key_path"`
 	Key     types.String `tfsdk:"key"`
 
-	Bastion ClusterResourceModelHostSSHBastion `tfsdk:"bastion"`
+	Bastion *ClusterResourceModelHostSSHBastion `tfsdk:"bastion"`
 }
 
 type ClusterResourceModelHostSSHBastion struct {
@@ -589,7 +589,7 @@ func getK0sctlConfig(ctx context.Context, dia *diag.Diagnostics, data *ClusterRe
 			ssh.AuthMethods = authMethods
 		}
 
-		if host.SSH.Bastion.Address.IsNull() {
+		if host.SSH.Bastion == nil || host.SSH.Bastion.Address.IsNull() {
 			ssh.Bastion = nil
 		} else {
 			ssh.Bastion = &k0s_rig.SSH{

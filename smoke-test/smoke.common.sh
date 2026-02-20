@@ -16,7 +16,7 @@ createCluster() {
 deleteCluster() {
   # cleanup any existing cluster
   envsubst < "${SCRIPT_DIR}/${BOOTLOOSE_TEMPLATE}" > bootloose.yaml
-  go tool github.com/k0sproject/bootloose delete && docker volume prune -f
+  go tool github.com/k0sproject/bootloose delete && docker volume prune -f || true
 }
 
 

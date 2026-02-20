@@ -4,13 +4,13 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 set -e
 
-. ${SCRIPT_DIR}/smoke.common.sh
+. "${SCRIPT_DIR}"/smoke.common.sh
 trap cleanup EXIT
 
 deleteCluster
 createCluster
 
-eval $(ssh-agent) 
+eval "$(ssh-agent)" 
 ssh-add id_rsa_k0s
 
 echo "* Starting test"
